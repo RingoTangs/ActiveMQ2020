@@ -1,0 +1,76 @@
+package com.ymy.activemq.jms.consumer;
+
+import org.apache.activemq.ActiveMQConnectionFactory;
+import org.apache.activemq.RedeliveryPolicy;
+
+import javax.jms.*;
+import java.io.IOException;
+
+/**
+ * ActiveMQ消费者 Destination--->Queue
+ */
+public class Consume {
+
+    public static final String ACTIVEMQ_URL = "tcp://192.168.110.132:61616";
+    public static final String QUEUE_NAME = "queue01";
+
+    public static void main(String[] args) throws JMSException, IOException {
+
+        System.out.println("******************我是消费者1************");
+
+        //1、按照给定的URL和默认的用户名密码,创建ActiveMQConnectionFactory
+        ActiveMQConnectionFactory activeMQConnectionFactory = new ActiveMQConnectionFactory();
+        activeMQConnectionFactory.setBrokerURL(ACTIVEMQ_URL);
+
+        //2、通过ConnectionFactory获取Connection,并且启动访问
+        Connection connection = activeMQConnectionFactory.createConnection();
+        connection.start();
+
+        //3、通过Connection创建Session
+        //createSession()有两个参数：第一个叫事务；第二个叫签收。
+        Session session = connection.createSession(true, Session.CLIENT_ACKNOWLEDGE);
+
+        //4、通过session创建Destination(Queue/Topic)
+        Queue queue = session.createQueue(QUEUE_NAME);
+
+
+        //5、通过Session创建消费者
+        MessageConsumer messageConsumer = session.createConsumer(queue);
+
+        //6、通过监听的方式来消费消息
+        messageConsumer.setMessageListener(new MessageListener() {
+            @Override
+            public void onMessage(Message message) {
+                if (null != message && message instanceof TextMessage) {
+                    TextMessage textMessage = (TextMessage) message;
+                    try {
+                        System.out.println("*******消费者接收到消息：" + textMessage.getText() + "*********");
+                        textMessage.acknowledge(); //开启客户端的手动签收 这里需要手动ACK
+//                        session.commit();
+                    } catch (JMSException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
+        System.in.read(); //保证控制台的灯不灭，这句话不写消费者还没有消费Message到就直接关闭连接了。
+        //7、关闭资源 从下到上依次关闭
+        messageConsumer.close();
+        session.close();
+        connection.close();
+
+        /*
+        while (true) {
+            //6、MessageConsumer(消费者)接收MQ中的消息
+            TextMessage textMessage = (TextMessage) messageConsumer.receive(4000);
+            if (textMessage != null) {
+                System.out.println("*******消费者接收到消息：" + textMessage.getText() + "*********");
+            } else {
+                break;
+            }
+        }
+        */
+
+
+    }
+}
